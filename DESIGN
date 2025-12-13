@@ -1,0 +1,166 @@
+// Code your design here
+
+module mem(
+    input  [4:0] wrt_data,
+    output reg [4:0] rd_data,
+    input rd_clk,wrt_clk,wrt_en,rd_en,wrt_full,
+    input [2:0] rd_ptr,wrt_ptr
+    );
+    
+  reg [4:0] mem[0:7];
+    // WRITE
+    always @(posedge wrt_clk) begin
+      if(wrt_en && !wrt_full) begin
+        mem[wrt_ptr] <= wrt_data;
+        end
+      else mem[wrt_ptr]<=0;
+    end
+
+  always @(*) begin
+    if (rd_en)
+        rd_data = mem[rd_ptr];
+    else
+        rd_data = 5'bx;   // or 'bx for debug
+end
+
+             
+    
+endmodule
+
+
+module b2g(
+    input [3:0] b,
+    output reg [3:0] g
+    );
+    always @(*)
+    begin
+     g[3]<= b[3];
+     g[2]<= b[2]^b[3];
+     g[1]<= b[1]^b[2];
+     g[0]<= b[0]^b[1];
+     end
+     
+endmodule
+
+
+module g2b(
+  input  [3:0] g,
+  output reg [3:0] b
+);
+   always @(*)
+   begin 
+       b[3] <= g[3];
+       b[2] <= g[3] ^ g[2];
+       b[1] <= g[3] ^ g[2] ^ g[1];
+       b[0] <= g[3] ^ g[2] ^ g[1] ^ g[0];
+   end
+endmodule
+
+
+module rd_src(
+    input        rd_clk,
+    input        rd_rst,
+    output reg   rd_empty,
+    output reg   ren,
+    output reg [3:0] rd_ptrf,
+    input  [3:0] wrt_ptr2,   // synced WRITE GRAY
+    input  [3:0] rd_ptr
+);
+
+    wire [3:0] rd_ptr_next;
+    wire [3:0] rd_gray_cur;
+    wire [3:0] rd_gray_next;
+
+    assign rd_ptr_next = rd_ptr + 1;
+
+    b2g g0(.b(rd_ptr),      .g(rd_gray_cur));
+    b2g g1(.b(rd_ptr_next), .g(rd_gray_next));
+
+    always @(posedge rd_clk) begin
+        if (rd_rst) begin
+            rd_empty <= 1'b1;
+            ren      <= 1'b0;
+            rd_ptrf  <= rd_ptr;
+        end
+        else begin
+            // empty is decided FIRST
+            rd_empty <= (rd_gray_next == wrt_ptr2);
+
+            // ren is a PULSE, not a level
+            ren <= ~rd_empty;
+
+            // pointer advances ONLY when ren was high
+            if (~rd_empty)
+                rd_ptrf <= rd_ptr_next;
+            else
+                rd_ptrf <= rd_ptr;
+        end
+    end
+endmodule
+
+
+module wrt_src(
+    input  [3:0] wrt_ptr,   // local WRITE BINARY
+    input  [3:0] rptr2,     // synced READ GRAY
+    input        wrt_clk,
+    input        wrt_rst,
+    output reg   wrt_full,
+    output reg   wrt_en,
+    output reg [3:0] wrt_ptrf
+);
+    wire [3:0] wrt_ptr_next;
+    wire [3:0] wrt_gray_next;
+    wire       full_next;
+
+    // Next write pointer
+    assign wrt_ptr_next = wrt_ptr + 1;
+
+    // Binary to Gray for FULL detection
+    b2g g1 (.b(wrt_ptr_next), .g(wrt_gray_next));
+
+    // COMBINATIONAL full decision (NO delay)
+    assign full_next =
+        (wrt_gray_next == {~rptr2[3:2], rptr2[1:0]});
+
+    always @(posedge wrt_clk) begin
+        if (wrt_rst) begin
+            wrt_full <= 1'b0;
+            wrt_en   <= 1'b0;
+            wrt_ptrf <= wrt_ptr;
+        end
+        else begin
+            // Register status
+            wrt_full <= full_next;
+
+            // Control uses combinational decision
+            if (!full_next) begin
+                wrt_en   <= 1'b1;          // write pulse
+                wrt_ptrf <= wrt_ptr_next;  // advance pointer
+            end
+            else begin
+                wrt_en   <= 1'b0;          // block write
+                wrt_ptrf <= wrt_ptr;       // hold pointer
+            end
+        end
+    end
+endmodule
+
+
+module stg_synth(
+    input [3:0]gray_in,
+    input clk,
+    input rst,
+    output reg [3:0] gray_out
+    );
+    reg [3:0] q;
+    always @(posedge clk) begin
+            if (rst) begin
+                q        <= 4'b0;
+                gray_out <= 4'b0;
+            end else begin
+                q        <= gray_in;
+                gray_out <= q;
+            end
+    end
+    
+endmodule
