@@ -10,10 +10,8 @@ reg rd_clk,wrt_clk,rd_rst,wrt_rst,wrt_fullf;
     wire rd_empty;
     wire rd_en;
   wire [3:0]rd_ptrf;
-    wire [3:0] wrt_ptr_synced_gray, connectwrt; //wrt to read
-    wire [3:0] rd_ptr_synced_gray, connectrd; //read to write synced
-    wire [3:0] wrt_ptr_bin_full; // Full 4-bit Binary (for G2B module output)
-    wire [3:0] rd_ptr_bin_full;  // Full 4-bit Binary (for G2B module output)
+  wire [3:0] wrt_ptr_synced_gray,rd_ptr_synced_gray; // changed into gray ready to sync
+  wire [3:0]  connectwrt, connectrd; //read and write synced
     always #15 wrt_clk = ~wrt_clk;
     always #7 rd_clk = ~rd_clk;
   
@@ -82,15 +80,6 @@ end
     .gray_out(connectrd)
     );
     
-    //Gray to Binary
-    g2b wrt_syncs(
-    .b(wrt_ptr_bin_full),
-    .g(connectwrt)
-    );
-    g2b rd_syncs(
-    .b(rd_ptr_bin_full),
-    .g(connectrd)
-    );
     
     //Memory
     mem dut(
@@ -153,6 +142,10 @@ initial begin
     #1200;
     $finish;
 end
+        
+        
+  	
+endmodule
         
         
   	
