@@ -8,7 +8,6 @@ module mem(
     );
     
   reg [4:0] mem[0:7];
-    // WRITE
     always @(posedge wrt_clk) begin
       if(wrt_en && !wrt_full) begin
         mem[wrt_ptr] <= wrt_data;
@@ -20,7 +19,7 @@ module mem(
     if (rd_en)
         rd_data = mem[rd_ptr];
     else
-        rd_data = 5'bx;   // or 'bx for debug
+        rd_data = 5'bx;   // only for debug 
 end
 
              
@@ -63,19 +62,19 @@ module rd_src(
     output reg   rd_empty,
     output reg   ren,
     output reg [3:0] rd_ptrf,
-    input  [3:0] wrt_ptr2,   // synced WRITE GRAY
+  input  [3:0] wrt_ptr2,   // synced gray code write
     input  [3:0] rd_ptr
 );
-
+  wire rd_empty_next;
     wire [3:0] rd_ptr_next;
     wire [3:0] rd_gray_cur;
     wire [3:0] rd_gray_next;
-
+	
     assign rd_ptr_next = rd_ptr + 1;
 
     b2g g0(.b(rd_ptr),      .g(rd_gray_cur));
     b2g g1(.b(rd_ptr_next), .g(rd_gray_next));
-
+  assign rd_empty_next=(rd_gray_next == wrt_ptr2);
     always @(posedge rd_clk) begin
         if (rd_rst) begin
             rd_empty <= 1'b1;
@@ -83,13 +82,8 @@ module rd_src(
             rd_ptrf  <= rd_ptr;
         end
         else begin
-            // empty is decided FIRST
-            rd_empty <= (rd_gray_next == wrt_ptr2);
-
-            // ren is a PULSE, not a level
+            rd_empty <= rd_empty_next;
             ren <= ~rd_empty;
-
-            // pointer advances ONLY when ren was high
             if (~rd_empty)
                 rd_ptrf <= rd_ptr_next;
             else
@@ -100,8 +94,8 @@ endmodule
 
 
 module wrt_src(
-    input  [3:0] wrt_ptr,   // local WRITE BINARY
-    input  [3:0] rptr2,     // synced READ GRAY
+    input  [3:0] wrt_ptr, 
+  input  [3:0] rptr2,// synced read gray
     input        wrt_clk,
     input        wrt_rst,
     output reg   wrt_full,
@@ -111,14 +105,10 @@ module wrt_src(
     wire [3:0] wrt_ptr_next;
     wire [3:0] wrt_gray_next;
     wire       full_next;
-
-    // Next write pointer
-    assign wrt_ptr_next = wrt_ptr + 1;
-
-    // Binary to Gray for FULL detection
+    
+  	assign wrt_ptr_next = wrt_ptr + 1;
     b2g g1 (.b(wrt_ptr_next), .g(wrt_gray_next));
 
-    // COMBINATIONAL full decision (NO delay)
     assign full_next =
         (wrt_gray_next == {~rptr2[3:2], rptr2[1:0]});
 
@@ -129,18 +119,15 @@ module wrt_src(
             wrt_ptrf <= wrt_ptr;
         end
         else begin
-            // Register status
             wrt_full <= full_next;
-
-            // Control uses combinational decision
-            if (!full_next) begin
-                wrt_en   <= 1'b1;          // write pulse
-                wrt_ptrf <= wrt_ptr_next;  // advance pointer
-            end
-            else begin
-                wrt_en   <= 1'b0;          // block write
-                wrt_ptrf <= wrt_ptr;       // hold pointer
-            end
+              if (!full_next) begin
+                  wrt_en   <= 1'b1;          
+                  wrt_ptrf <= wrt_ptr_next;  
+              end
+              else begin
+                  wrt_en   <= 1'b0;          
+                  wrt_ptrf <= wrt_ptr;      
+              end
         end
     end
 endmodule
