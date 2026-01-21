@@ -1,0 +1,47 @@
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: 
+// 
+// Create Date: 13.01.2026 22:10:20
+// Design Name: 
+// Module Name: top_async_fifo
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
+module top_async_fifo (
+    input  wire        wrt_clk,rd_clk,
+    input  wire        btn_write,
+    input  wire        btn_read,
+    input  wire [3:0]  sw,
+    output wire [3:0]  led,
+    output wire        led_full,
+    output wire        led_empty
+);
+
+
+
+    wire wrt_en  = btn_write & ~led_full;
+    wire rd_en   = btn_read  & ~led_empty;
+
+    async_fifo_top FIFO (
+        .wrt_clk (wrt_clk),
+        .rd_clk  (rd_clk),
+        .wrt_en  (wrt_en),
+        .rd_en   (rd_en),
+        .wrt_data(sw),
+        .rd_data (led),
+        .wrt_full(led_full),
+        .rd_empty(led_empty)
+    );
+
+endmodule
