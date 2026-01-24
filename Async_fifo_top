@@ -1,0 +1,110 @@
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: 
+// 
+// Create Date: 12.01.2026 21:26:50
+// Design Name: 
+// Module Name: async_fifo_top
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
+
+
+module async_fifo_top(
+ input  wire       wrt_clk,
+    input  wire       rd_clk,
+    input  wire       wrt_en,
+    input  wire       rd_en,
+    input  wire [3:0] wrt_data,
+    output wire [3:0] rd_data,
+    output wire       wrt_full,
+    output wire       rd_empty
+    );
+  wire [3:0] wrt_ptrf;
+  reg [2:0] wrt_ptr_real, rd_ptr_real;
+  reg [3:0] rd_ptr,wrt_ptr;
+  reg [3:0] rd_ptr_next,wrt_ptr_next;
+  wire [3:0]rd_ptrf;
+  wire [3:0] wrt_ptr_synced_gray,rd_ptr_synced_gray; // changed into gray ready to sync
+  wire [3:0]  connectwrt, connectrd;
+    wrt_src wrt_src_dut(
+        .wrt_ptr(wrt_ptr),
+      .rptr2(connectrd),
+        .wrt_clk(wrt_clk),
+        .wrt_rst(1'b0),
+        .wrt_full(wrt_full),
+        .wrt_ptrf(wrt_ptrf)
+    );
+    always @(posedge wrt_clk) begin
+        if (wrt_en)begin
+            wrt_ptr <= wrt_ptrf;
+            wrt_ptr_real<=wrt_ptrf[2:0];
+            end
+    end
+    //read src
+    rd_src rd_src_dut(
+    .rd_clk(rd_clk),
+    .rd_rst(1'b0),
+    .wrt_ptr2(connectwrt),
+    .rd_ptr(rd_ptr),
+    .rd_ptrf(rd_ptrf),
+    .rd_empty(rd_empty)
+    );
+    always @(posedge rd_clk) begin
+            if (rd_en)begin
+            rd_ptr <= rd_ptrf;
+            rd_ptr_real<=rd_ptrf[2:0];
+            end
+    end
+   
+    //Binary to gray
+    always @(posedge rd_clk) rd_ptr_next<=rd_ptr+1;
+    always @(posedge wrt_clk) wrt_ptr_next<=wrt_ptr+1;
+
+    b2g wrt_sync(
+      .b(wrt_ptr_next),
+    .g(wrt_ptr_synced_gray)
+    );
+    b2g rd_sync(
+      .b(rd_ptr_next),
+    .g(rd_ptr_synced_gray)
+    );
+    
+    //Stage Synthesiser
+    stg_synth wrt_ss(
+    .gray_in(wrt_ptr_synced_gray),
+    .clk(rd_clk),
+    .rst(rd_rst),
+    .gray_out(connectwrt)
+    );
+    stg_synth rd_ss(
+    .gray_in(rd_ptr_synced_gray),
+    .clk(wrt_clk),
+      .rst(wrt_rst),
+    .gray_out(connectrd)
+    );
+    
+    
+    //Memory
+    mem dut(
+      .rd_data(rd_data),
+    .wrt_data(wrt_data),
+    .rd_clk(rd_clk),
+    .wrt_clk(wrt_clk),
+    .wrt_en(wrt_en),
+    .rd_en(rd_en),
+    .rd_ptr(rd_ptr[2:0]),
+      .wrt_ptr(wrt_ptr[2:0]),
+      .wrt_full(wrt_full)
+    );
+endmodule
