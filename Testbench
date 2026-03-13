@@ -2,9 +2,11 @@
 module testbench;
   wire [4:0] rd_data;
   reg [4:0] wrt_data;
-  reg [3:0] wrt_ptrf;
-reg rd_clk,wrt_clk,rd_rst,wrt_rst,wrt_fullf;
+  wire [3:0] wrt_ptrf;
+  reg [2:0] wrt_ptr_real, rd_ptr_real;
+reg rd_clk,wrt_clk,rd_rst,wrt_rst;
   reg [3:0] rd_ptr,wrt_ptr;
+  reg [3:0] rd_ptr_next,wrt_ptr_next;
     wire wrt_full;
     wire wrt_en;
     wire rd_empty;
@@ -12,51 +14,53 @@ reg rd_clk,wrt_clk,rd_rst,wrt_rst,wrt_fullf;
   wire [3:0]rd_ptrf;
   wire [3:0] wrt_ptr_synced_gray,rd_ptr_synced_gray; // changed into gray ready to sync
   wire [3:0]  connectwrt, connectrd; //read and write synced
-    always #15 wrt_clk = ~wrt_clk;
-    always #7 rd_clk = ~rd_clk;
+    always #7 wrt_clk = ~wrt_clk;
+    always #5 rd_clk = ~rd_clk; 	
   
-
-  	
-  initial begin
-    $dumpfile("dump.vcd");
-    $dumpvars(0, testbench);
-end
 
     //write src
     wrt_src wrt_src_dut(
         .wrt_ptr(wrt_ptr),
       .rptr2(connectrd),
+      .wrt_en(wrt_en),
         .wrt_clk(wrt_clk),
         .wrt_rst(wrt_rst),
         .wrt_full(wrt_full),
-        .wrt_en(wrt_en),
         .wrt_ptrf(wrt_ptrf)
     );
     always @(posedge wrt_clk) begin
-        if (wrt_rst)
+        if (wrt_rst)begin
             wrt_ptr <= 4'b0000;
-      else if (wrt_en)
+            wrt_ptr_real<=3'b000; 
+            end
+      else if (wrt_en)begin
             wrt_ptr <= wrt_ptrf;
+            wrt_ptr_real<=wrt_ptrf[2:0];
+            end
     end
-    assign wrt_fullf=wrt_full;
     //read src
     rd_src rd_src_dut(
     .rd_clk(rd_clk),
     .rd_rst(rd_rst),
-      .wrt_ptr2(connectwrt),
+    .wrt_ptr2(connectwrt),
     .rd_ptr(rd_ptr),
-      .ren(rd_en),
+    .ren(rd_en),
     .rd_ptrf(rd_ptrf),
     .rd_empty(rd_empty)
     );
     always @(posedge rd_clk) begin
-        if (rd_rst)
+        if (rd_rst)begin
             rd_ptr <= 4'b0000;
-        else if (rd_en)
+            rd_ptr_real<=3'b000;
+            end
+        else if (rd_en)begin
             rd_ptr <= rd_ptrf;
+            rd_ptr_real<=rd_ptrf[2:0];
+            end
     end
-    
+   
     //Binary to gray
+
     b2g wrt_sync(
       .b(wrt_ptr),
     .g(wrt_ptr_synced_gray)
@@ -91,61 +95,52 @@ end
     .rd_en(rd_en),
     .rd_ptr(rd_ptr[2:0]),
       .wrt_ptr(wrt_ptr[2:0]),
-      .wrt_full(wrt_fullf)
+      .wrt_full(wrt_full)
     );
     
     initial begin
     wrt_clk = 1'b0; rd_clk = 1'b0; wrt_rst = 1'b1; rd_rst = 1'b1; wrt_data = 5'd0;wrt_ptr=0;
-       #10 wrt_rst = 1'b0;
+       #50 wrt_rst = 1'b0;
         rd_rst = 1'b0;
         $display("Time: %t | Reset De-asserted.", $time);
     end
           integer write_count = 0;
-
-  always @(posedge wrt_clk) begin
- 
-            write_count <= write_count + 1;
-    end
-  always @(wrt_ptr[2:0]) begin
-    if (wrt_rst) begin
-            write_count <= 0;
-            wrt_data <= 5'd0;
-        end
-        else if (wrt_en) begin
-            case (write_count % 3)
-                0: wrt_data <= 5'd10;
-                1: wrt_data <= 5'd20;
-                2: wrt_data <= 5'd30;
-            endcase
-        end
-  end
-
-  reg rd_valid;
-
-always @(posedge rd_clk) begin
-    if (rd_rst)
-        rd_valid <= 0;
-    else
-        rd_valid <= rd_en;
+reg toggle;
+always @(posedge wrt_clk) begin
+  if (wrt_rst) toggle <= 0;
+  else         toggle <= ~toggle;
 end
 
+// write_count increments every 2nd cycle
+always @(posedge wrt_clk) begin
+  if (wrt_rst) write_count <= 0;
+  else if (toggle) write_count <= write_count + 1;
+end
+
+// wrt_data changes every 2nd cycle
+always @(posedge wrt_clk) begin
+  if (wrt_rst) wrt_data <= 5'd0;
+  else if (wrt_en && toggle) begin
+    case (write_count % 3)
+      0: wrt_data <= 5'd10;
+      1: wrt_data <= 5'd20;
+      2: wrt_data <= 5'd30;
+    endcase
+  end
+end
 always @(posedge rd_clk) begin
-    if (rd_valid)
+    if (~rd_rst&& rd_en)
       $display("T=%0t RD_DATA=%0d address=%0d",
-               $time, rd_data, rd_ptr[2:0]);
+               $time, rd_data, rd_ptr_real[2:0]);
 end
 
 
       
 
 initial begin
-    #1200;
+    #2000;
     $finish;
 end
-        
-        
-  	
-endmodule
         
         
   	
