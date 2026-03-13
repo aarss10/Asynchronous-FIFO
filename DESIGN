@@ -1,25 +1,6 @@
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 12.01.2026 18:33:55
-// Design Name: 
-// Module Name: modules
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
 
-
+//Memory Module
 module mem(
     input  [3:0] wrt_data,
     output reg [3:0] rd_data,
@@ -44,7 +25,7 @@ end
     
 endmodule
 
-
+//Binary to Gray
 module b2g(
     input [3:0] b,
     output reg [3:0] g
@@ -59,21 +40,7 @@ module b2g(
      
 endmodule
 
-
-module g2b(
-  input  [3:0] g,
-  output reg [3:0] b
-);
-   always @(*)
-   begin 
-       b[3] <= g[3];
-       b[2] <= g[3] ^ g[2];
-       b[1] <= g[3] ^ g[2] ^ g[1];
-       b[0] <= g[3] ^ g[2] ^ g[1] ^ g[0];
-   end
-endmodule
-
-
+//Read Source Module
 module rd_src(
     input        rd_clk,
     input        rd_rst,
@@ -104,7 +71,7 @@ module rd_src(
     end
 endmodule
 
-
+//Write Source
 module wrt_src(
     input  [3:0] wrt_ptr, 
   input  [3:0] rptr2,// synced read gray
@@ -140,7 +107,7 @@ module wrt_src(
     end
 endmodule
 
-
+//Stage Synthesizer 
 module stg_synth(
     input [3:0]gray_in,
     input clk,
