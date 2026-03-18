@@ -28,5 +28,5 @@ The asynchronous FIFO consists of the following main components:
 
 Data flow:
 <p align="center">
-  <img src="images/fifo.png" width="500"/>
+  <img src="fifo.png" width="500"/>
 </p>
