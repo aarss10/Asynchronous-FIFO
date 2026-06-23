@@ -33,5 +33,5 @@ Data flow:
 
 Output Waveform Obtained:
 <p align="center">
-  <img src="tb.png" width="500"/>
+  <img src="Screenshot 2026-06-23 162407.png" width="500"/>
 </p>
