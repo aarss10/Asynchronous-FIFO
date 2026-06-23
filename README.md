@@ -30,8 +30,3 @@ Data flow:
 <p align="center">
   <img src="fifo.png" width="500"/>
 </p>
-
-Output Waveform Obtained:
-<p align="center">
-  <img src="Screenshot 2026-06-23 162407.png" width="500"/>
-</p>
