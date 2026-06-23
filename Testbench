@@ -1,147 +1,104 @@
 `timescale 1ns / 1ps
-module testbench;
-  wire [4:0] rd_data;
-  reg [4:0] wrt_data;
-  wire [3:0] wrt_ptrf;
-  reg [2:0] wrt_ptr_real, rd_ptr_real;
-reg rd_clk,wrt_clk,rd_rst,wrt_rst;
-  reg [3:0] rd_ptr,wrt_ptr;
-  reg [3:0] rd_ptr_next,wrt_ptr_next;
-    wire wrt_full;
-    wire wrt_en;
-    wire rd_empty;
-    wire rd_en;
-  wire [3:0]rd_ptrf;
-  wire [3:0] wrt_ptr_synced_gray,rd_ptr_synced_gray; // changed into gray ready to sync
-  wire [3:0]  connectwrt, connectrd; //read and write synced
-    always #7 wrt_clk = ~wrt_clk;
-    always #5 rd_clk = ~rd_clk; 	
-  
 
-    //write src
-    wrt_src wrt_src_dut(
-        .wrt_ptr(wrt_ptr),
-      .rptr2(connectrd),
-      .wrt_en(wrt_en),
+module top_tb;
+
+    parameter width = 8;
+    parameter depth = 8;
+    parameter ptr_w = $clog2(depth);
+
+    reg wrt_clk;
+    reg rd_clk;
+    reg wrt_rst;
+    reg rd_rst;
+
+    reg r_en;
+    reg w_en;
+    reg [width-1:0] data_in;
+
+    wire [width-1:0] data_out;
+    wire full;
+    wire empty;
+
+    integer i;
+
+    top #(
+        .width(width),
+        .depth(depth),
+        .ptr_w(ptr_w)
+    ) dut (
         .wrt_clk(wrt_clk),
+        .rd_clk(rd_clk),
         .wrt_rst(wrt_rst),
-        .wrt_full(wrt_full),
-        .wrt_ptrf(wrt_ptrf)
+        .rd_rst(rd_rst),
+        .r_en(r_en),
+        .w_en(w_en),
+        .data_in(data_in),
+        .data_out(data_out),
+        .full(full),
+        .empty(empty)
     );
-    always @(posedge wrt_clk) begin
-        if (wrt_rst)begin
-            wrt_ptr <= 4'b0000;
-            wrt_ptr_real<=3'b000; 
-            end
-      else if (wrt_en)begin
-            wrt_ptr <= wrt_ptrf;
-            wrt_ptr_real<=wrt_ptrf[2:0];
-            end
-    end
-    //read src
-    rd_src rd_src_dut(
-    .rd_clk(rd_clk),
-    .rd_rst(rd_rst),
-    .wrt_ptr2(connectwrt),
-    .rd_ptr(rd_ptr),
-    .ren(rd_en),
-    .rd_ptrf(rd_ptrf),
-    .rd_empty(rd_empty)
-    );
-    always @(posedge rd_clk) begin
-        if (rd_rst)begin
-            rd_ptr <= 4'b0000;
-            rd_ptr_real<=3'b000;
-            end
-        else if (rd_en)begin
-            rd_ptr <= rd_ptrf;
-            rd_ptr_real<=rd_ptrf[2:0];
-            end
-    end
-   
-    //Binary to gray
 
-    b2g wrt_sync(
-      .b(wrt_ptr),
-    .g(wrt_ptr_synced_gray)
-    );
-    b2g rd_sync(
-      .b(rd_ptr),
-    .g(rd_ptr_synced_gray)
-    );
-    
-    //Stage Synthesiser
-    stg_synth wrt_ss(
-    .gray_in(wrt_ptr_synced_gray),
-    .clk(rd_clk),
-    .rst(rd_rst),
-    .gray_out(connectwrt)
-    );
-    stg_synth rd_ss(
-    .gray_in(rd_ptr_synced_gray),
-    .clk(wrt_clk),
-      .rst(wrt_rst),
-    .gray_out(connectrd)
-    );
-    
-    
-    //Memory
-    mem dut(
-      .rd_data(rd_data),
-    .wrt_data(wrt_data),
-    .rd_clk(rd_clk),
-    .wrt_clk(wrt_clk),
-    .wrt_en(wrt_en),
-    .rd_en(rd_en),
-    .rd_ptr(rd_ptr[2:0]),
-      .wrt_ptr(wrt_ptr[2:0]),
-      .wrt_full(wrt_full)
-    );
-    
+    // Write clock: 10 ns period
     initial begin
-    wrt_clk = 1'b0; rd_clk = 1'b0; wrt_rst = 1'b1; rd_rst = 1'b1; wrt_data = 5'd0;wrt_ptr=0;
-       #50 wrt_rst = 1'b0;
-        rd_rst = 1'b0;
-        $display("Time: %t | Reset De-asserted.", $time);
+        wrt_clk = 1'b0;
+        forever #5 wrt_clk = ~wrt_clk;
     end
-          integer write_count = 0;
-reg toggle;
-always @(posedge wrt_clk) begin
-  if (wrt_rst) toggle <= 0;
-  else         toggle <= ~toggle;
-end
 
-// write_count increments every 2nd cycle
-always @(posedge wrt_clk) begin
-  if (wrt_rst) write_count <= 0;
-  else if (toggle) write_count <= write_count + 1;
-end
+    // Read clock: 16 ns period
+    initial begin
+        rd_clk = 1'b0;
+        forever #8 rd_clk = ~rd_clk;
+    end
 
-// wrt_data changes every 2nd cycle
-always @(posedge wrt_clk) begin
-  if (wrt_rst) wrt_data <= 5'd0;
-  else if (wrt_en && toggle) begin
-    case (write_count % 3)
-      0: wrt_data <= 5'd10;
-      1: wrt_data <= 5'd20;
-      2: wrt_data <= 5'd30;
-    endcase
-  end
-end
-always @(posedge rd_clk) begin
-    if (~rd_rst&& rd_en)
-      $display("T=%0t RD_DATA=%0d address=%0d",
-               $time, rd_data, rd_ptr_real[2:0]);
-end
+    initial begin
+        // Initial/reset state
+        wrt_rst = 1'b1;
+        rd_rst  = 1'b1;
+        w_en    = 1'b0;
+        r_en    = 1'b0;
+        data_in = 0;
 
+        #30;
+        wrt_rst = 1'b0;
+        rd_rst  = 1'b0;
 
-      
+        // Allow reset release and synchronizers to settle
+        repeat (4) @(posedge wrt_clk);
+        repeat (4) @(posedge rd_clk);
 
-initial begin
-    #2000;
-    $finish;
-end
-        
-        
-  	
+        @(negedge wrt_clk);
+        w_en    = 1'b1;
+        data_in = 8'h10;
+      @(negedge rd_clk);
+        r_en = 1'b1;
+        for (i = 1; i < 10000; i = i + 1) begin
+            @(negedge wrt_clk);
+            data_in = 8'h10 + i;
+        end
+
+        // At this negedge, the last value has already been
+        // written on the preceding posedge.
+        // The FIFO should now be full because depth values were written.
+        @(posedge wrt_clk);
+        #1;
+
+        repeat (4) @(posedge rd_clk);
+        for (i = 0; i < depth; i = i + 1) begin
+            @(posedge rd_clk);
+            #1;
+
+            if (data_out !== (8'h10 + i)) begin
+                $display("[%0t] ERROR: expected %h, got %h",
+                         $time, (8'h10 + i), data_out);
+                $finish;
+            end
+            else begin
+                $display("[%0t] READ OK: %h", $time, data_out);
+            end
+        end
+       
+        #50;
+        $finish;
+    end
+
 endmodule
